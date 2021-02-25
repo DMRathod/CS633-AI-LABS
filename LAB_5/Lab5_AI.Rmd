@@ -1,0 +1,253 @@
+---
+title: "AI_LAB_5"
+author: "Rathod Dharmraj"
+date: "2/20/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{R}
+library(bnclassify)
+library(bnlearn)
+library(graph)
+```
+
+
+Q1: learn the dependency between random variable
+
+```{R}
+library(bnlearn)
+#head(course.grades)
+course.grades<-read.table("C:/Users/RD/Downloads/2020_bn_nb_data.txt",head=TRUE)
+course.grades <- lapply(course.grades,as.factor)
+#course.grades
+course.grades <- data.frame(course.grades)
+
+
+
+#with different scores
+course.grades.net <- hc(course.grades[,-9],score = "aic")
+course.grades.net1 <- hc(course.grades[,-9],score = "bdla")
+course.grades.net2 <- hc(course.grades[,-9],score = "bic")
+course.grades.net3 <- hc(course.grades[,-9],score = "k2")
+
+
+course.grades.net
+course.grades.net1
+course.grades.net2
+course.grades.net3
+
+plot(course.grades.net)
+plot(course.grades.net1)
+plot(course.grades.net2)
+plot(course.grades.net3)
+
+
+
+```
+
+
+
+
+
+
+Q2:Using the data, learn the CPTs for each course node.
+
+```{R}
+
+course.grades.net.fit <- bn.fit(course.grades.net,course.grades[,-9])
+course.grades.net.fit1 <- bn.fit(course.grades.net1,course.grades[,-9])
+course.grades.net.fit2 <- bn.fit(course.grades.net2,course.grades[,-9])
+course.grades.net.fit3 <- bn.fit(course.grades.net3,course.grades[,-9])
+print("CPT Of Each Node in network 1")
+course.grades.net.fit
+
+print(" CPT Of Each Node in network 2")
+course.grades.net.fit1
+
+print(" CPT Of Each Node in network 3")
+course.grades.net.fit2
+
+print(" CPT Of Each Node in network 4")
+course.grades.net.fit3
+
+```
+
+
+
+Q3:What grade will a student get in PH100 if he earns DD in EC100, CC in IT101 and CD in MA101.
+any of this trained model would give the same prediction about the grade.
+```{R}
+#cquery(course.grades.net.fit, event = c(EC100 = "AB"), evidence = TRUE)
+values <- c('AA' ,'AB', 'BB', 'BC', 'CC' ,'CD' ,'DD','F')
+x <- 0
+for(i in 1:length(values))
+{
+  #conditional query to the BN network
+  x <- append(x,cpquery(course.grades.net.fit3, event = ((PH100  == values[i])), evidence = ((EC100 == 'DD') & IT101  == 'CC' & MA101 == 'CD')))
+}
+values[match(max(x),x)]
+
+```
+
+
+Q4:The last column in the data file indicates whether a student qualifies for an internship program or not. From the given data, take 70 percent data for training and build a naive Bayes classifier (considering that the grades earned in different courses are independent of each other) which takes in the student’s performance and returns the qualification status with a probability. Test your classifier on the remaining 30 percent data.
+
+
+```{R}
+library(caTools)
+x <<- 0
+Generate_Set <-function(SplitRatio = 0.70)
+{
+  
+  #get the data
+  dataset <- read.table("C:/Users/RD/Downloads/2020_bn_nb_data.txt",head = TRUE)
+  data <- data.frame(dataset)
+  
+  #split the data
+  split <- sample.split(data$QP,SplitRatio)
+  Train_set <<- subset(data,split == TRUE)
+  Test_set <<- subset(data,split == FALSE)
+
+}
+
+Check_BN_model <-function()
+{
+  #generating the random samples for test and train
+  Generate_Set()
+  #
+  #lapply
+  
+  Training_dataset <- lapply(Train_set,as.factor)
+  Test_dataset <-lapply(Test_set,as.factor)
+  
+  Training_dataset <- data.frame(Training_dataset)
+  Test_dataset <- data.frame(Test_dataset)
+
+  #making the NB with class with training dataset
+  nb.Training_dataset <-nb(class = 'QP',dataset = Training_dataset)
+  
+  #learning the parameter
+  nb.Training_dataset <- lp(nb.Training_dataset, Training_dataset, smooth = 0)
+  plot(nb.Training_dataset)
+  
+  #predicting the class with probability with test data
+  p <-predict(nb.Training_dataset,Test_dataset,prob = TRUE)
+  print(head(p))
+  
+  ##predicting the class without probability with test data
+  p <-predict(nb.Training_dataset,Test_dataset)
+  #print(p) 
+  
+  #generate the confusion matrix
+  cm <-table(predicted = p, true = Test_dataset$QP)
+  print(cm)
+  
+  #calculating the accuracy
+  accuracy = bnclassify::accuracy(p,Test_dataset$QP)
+  print(accuracy)
+  return(accuracy)
+}
+```
+```{R}
+
+k <- Check_BN_model()
+x <- append(x,k)
+
+```
+
+#run Above code for several times becuase random sampling sometime lead to inappropriate dataset.(result with some invalid matching level)
+
+
+```{R}
+library(dplyr)
+print(sum(x)/length(x[-1]))
+#View(Test_set)
+#View(Train_set)
+```
+
+Q5.Repeat 4, considering that the grades earned in different courses may be dependent.
+
+```{R}
+Check_BN_model_Dependent <-function(){
+  
+  #Generate_Set()
+  
+  tn <- tan_cl("QP",Training_dataset)
+  tn <-lp(tn,Training_dataset,smooth = 1)
+  plot(tn)
+  
+  p<-predict(tn,Test_dataset,prob = TRUE)
+  head(p)
+  
+  p<-predict(tn,Test_dataset)
+  
+  
+  cm <- table(predicted =p,true =Test_dataset$QP)
+  print(cm)
+  
+  accuracy = bnclassify::accuracy(p,Test_dataset$QP)
+  print(accuracy)
+}
+```
+```{R}
+
+Check_BN_model_Dependent()
+```
+
+
+
+#SOME RANDOM SAMPLING FROM THE SAME PROBABILITY DISTRIBUTION
+```{R}
+subject_data<-read.table("C:/Users/RD/Downloads/2020_bn_nb_data.txt",head=TRUE)
+subject_data<- lapply(course.grades,as.factor)
+#course.grades
+subject_data <- data.frame(subject_data)
+
+subject_data.net <- hc(subject_data ,score = "bic")
+subject_data.net <-bn.fit(subject_data.net,subject_data)
+
+subject_data.net1 <- hc(subject_data,score = "aic")
+subject_data.net1 <-bn.fit(subject_data.net1,subject_data)
+
+
+sample.bn20 <- cpdist(subject_data.net,nodes = nodes(subject_data.net),evidence = TRUE,n = 20)
+Training_sample<-sample.bn20
+
+sample.bn21 <- cpdist(subject_data.net1,nodes = nodes(subject_data.net1),evidence = TRUE,n = 20)
+Testing_sample <- sample.bn21
+
+
+nb.Training_sample <- nb(class = "QP",dataset = Training_sample)
+plot(nb.Training_sample)
+nb.Training_sample <- lp(nb.Training_sample,Training_sample, smooth = 0)
+
+p<-predict(nb.Training_sample,Testing_sample[,-9])
+p
+
+cm <- table(predicted =p,true =Testing_sample$QP)
+cm
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
