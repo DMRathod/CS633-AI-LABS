@@ -3,6 +3,7 @@
 So we can make a 3*3 state or a string state.
 but 3*3 seems more logical and simple so we'll just go w/ that
 """
+import numpy as np
 from Agents.bestFirstSearch import bestPathAgent
 from copy import deepcopy
 import numpy as np
